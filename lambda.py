@@ -162,37 +162,38 @@ def get_alarms_to_create(asg, instance_id):
     """
 
     for alarm_key in get_alarm_keys(asg):
+        has_key = _key_existing_size__list(s3, ALARM_TEMPLATES_BUCKET, alarm_key)
+        if has_key is not None:
+            # Read alarm templates from S3 and cache them in memory.
+            if alarm_key not in ALARM_TEMPLATES_CACHE:
+                ALARM_TEMPLATES_CACHE[alarm_key] = get_s3_object_body(
+                    Bucket=ALARM_TEMPLATES_BUCKET,
+                    Key=alarm_key,
+                )
+            template_string = ALARM_TEMPLATES_CACHE[alarm_key]
 
-        # Read alarm templates from S3 and cache them in memory.
-        if alarm_key not in ALARM_TEMPLATES_CACHE:
-            ALARM_TEMPLATES_CACHE[alarm_key] = get_s3_object_body(
-                Bucket=ALARM_TEMPLATES_BUCKET,
-                Key=alarm_key,
-            )
-        template_string = ALARM_TEMPLATES_CACHE[alarm_key]
+            # Render the template using variables from the ASG and instance.
+            template_variables = {
+                'asg.AutoScalingGroupName': asg['AutoScalingGroupName'],
+                'instance.InstanceId': instance_id,
+            }
+            for tag in asg['Tags']:
+                var_name = 'asg.Tags.' + tag['Key']
+                template_variables[var_name] = tag['Value']
+            for var_name, value in template_variables.items():
+                template_string = template_string.replace(
+                    '{{' + var_name + '}}',
+                    value,
+                )
 
-        # Render the template using variables from the ASG and instance.
-        template_variables = {
-            'asg.AutoScalingGroupName': asg['AutoScalingGroupName'],
-            'instance.InstanceId': instance_id,
-        }
-        for tag in asg['Tags']:
-            var_name = 'asg.Tags.' + tag['Key']
-            template_variables[var_name] = tag['Value']
-        for var_name, value in template_variables.items():
-            template_string = template_string.replace(
-                '{{' + var_name + '}}',
-                value,
-            )
+            # It should be valid JSON now.
+            alarm = json.loads(template_string)
 
-        # It should be valid JSON now.
-        alarm = json.loads(template_string)
+            # Set the alarm name programatically so it can be found and deleted
+            # after the instance has been terminated.
+            alarm['AlarmName'] = ALARM_NAME_PREFIX + instance_id + ':' + alarm_key
 
-        # Set the alarm name programatically so it can be found and deleted
-        # after the instance has been terminated.
-        alarm['AlarmName'] = ALARM_NAME_PREFIX + instance_id + ':' + alarm_key
-
-        yield alarm
+            yield alarm
 
 
 def get_s3_object_body(**kwargs):
@@ -200,6 +201,9 @@ def get_s3_object_body(**kwargs):
     Returns the content of an object in S3.
 
     """
+    print(','.join('{}={}'.format(k, v) for k, v in kwargs.items()))
+
+
 
     response = s3.get_object(**kwargs)
     if response['ResponseMetadata']['HTTPStatusCode'] != 200:
@@ -207,6 +211,15 @@ def get_s3_object_body(**kwargs):
 
     return response['Body'].read().decode('utf-8')
 
+def _key_existing_size__list(client, bucket, key):
+    """return the key's size if it exist, else None"""
+    response = client.list_objects_v2(
+        Bucket=bucket,
+        Prefix=key,
+    )
+    for obj in response.get('Contents', []):
+        if obj['Key'] == key:
+            return obj['Size']
 
 def put_metric_alarm(**alarm):
     """
