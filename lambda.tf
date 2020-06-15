@@ -1,5 +1,5 @@
 module "lambda" {
-  source = "github.com/claranet/terraform-aws-lambda?ref=v1.1.0"
+  source = "github.com/ronaldkonjer/terraform-aws-lambda?ref=v1.1.0"
 
   function_name = var.name
   description   = "Manages ASG instance alarms"
@@ -52,10 +52,12 @@ data "aws_iam_policy_document" "lambda" {
     effect = "Allow"
 
     actions = [
-      "s3:GetObject",
+      #"s3:GetObject",
+      "s3:GetObject"
     ]
 
     resources = [
+      "arn:aws:s3:::${aws_s3_bucket.alarm_templates.id}",
       "arn:aws:s3:::${aws_s3_bucket.alarm_templates.id}/*",
     ]
   }
