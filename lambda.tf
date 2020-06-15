@@ -53,12 +53,12 @@ data "aws_iam_policy_document" "lambda" {
 
     actions = [
       #"s3:GetObject",
-      "s3:GetObject"
+      "s3:*"
     ]
 
     resources = [
       "arn:aws:s3:::${aws_s3_bucket.alarm_templates.id}",
-      "arn:aws:s3:::${aws_s3_bucket.alarm_templates.id}/*",
+      "arn:aws:s3:::${aws_s3_bucket.alarm_templates.id}/*"
     ]
   }
 }
