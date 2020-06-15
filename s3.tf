@@ -8,5 +8,5 @@ resource "random_id" "bucket_name" {
 resource "aws_s3_bucket" "alarm_templates" {
   bucket = random_id.bucket_name.hex
  #acl    = "private"
-  acl    = "bucket-owner-full-control"
+  acl    = "private"
 }
