@@ -162,8 +162,10 @@ def get_alarms_to_create(asg, instance_id):
     """
 
     for alarm_key in get_alarm_keys(asg):
+        print('Check s3 if template exists with key: {}'.format(alarm_key))
         has_key = _key_existing_size__list(s3, ALARM_TEMPLATES_BUCKET, alarm_key)
         if has_key is not None:
+            print('Found S3 key: {}, move it to cache and create alarm for it'.format(alarm_key))
             # Read alarm templates from S3 and cache them in memory.
             if alarm_key not in ALARM_TEMPLATES_CACHE:
                 ALARM_TEMPLATES_CACHE[alarm_key] = get_s3_object_body(
